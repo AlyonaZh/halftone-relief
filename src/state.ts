@@ -1,5 +1,6 @@
 // Единое состояние: настройки эффекта (сохраняются в localStorage) и состояние приложения.
 import { defaultSettings, PARAM_KEYS, PARAMS, type Settings } from './defaults';
+import { effectChanged, type PresetId } from './presets';
 
 type Listener<T> = (state: T, prev: T) => void;
 
@@ -98,6 +99,8 @@ export interface AppState {
   exportStage: ExportStage;
   seed: number;
   loading: boolean;
+  /** Выбранный звуковой пресет; при старте и после сброса — нет */
+  preset: PresetId | null;
 }
 
 export const app = new Store<AppState>({
@@ -118,6 +121,12 @@ export const app = new Store<AppState>({
   exportStage: 'idle',
   seed: Math.random() * 1000,
   loading: false,
+  preset: null,
+});
+
+// Ручное изменение параметра эффекта или реакции снимает выделение пресета (цвет — нет)
+settings.subscribe((s, prev) => {
+  if (app.get().preset && effectChanged(s, prev)) app.set({ preset: null });
 });
 
 /** Источник звука для реактивности (SPEC §6, таблица «Источник звука») */
@@ -146,3 +155,28 @@ export function saveCollapsed(v: Record<string, boolean>) {
     /* ignore */
   }
 }
+
+// ---------- Подсказка первого входа ----------
+
+const COACH_KEY = 'hr.coach.audio.dismissed';
+
+export function coachDismissed(): boolean {
+  try {
+    return localStorage.getItem(COACH_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Закрыть навсегда; «Сбросить настройки» этот флаг не трогает */
+export function dismissCoach() {
+  try {
+    localStorage.setItem(COACH_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+  coachListeners.forEach((l) => l());
+}
+
+const coachListeners = new Set<() => void>();
+export const onCoachDismiss = (l: () => void) => coachListeners.add(l);

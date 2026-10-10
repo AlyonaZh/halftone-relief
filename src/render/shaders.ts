@@ -69,13 +69,15 @@ uniform float uAspect;   // ширина / высота
 uniform float uFreq;     // периодов шума на высоту кадра
 uniform float uTime;
 uniform vec3 uSeed;
+uniform vec4 uCrop;      // фрагмент кадра в uv: xy — начало, zw — размер (весь кадр — 0,0,1,1)
 ${NOISE}
 float fbm(vec3 p) {
   // две октавы — гладкое поле
   return snoise(p) * 0.66 + snoise(p * 2.03 + vec3(17.1, 3.3, 7.7)) * 0.34;
 }
 void main() {
-  vec3 p = vec3(vUv.x * uAspect, vUv.y, 0.0) * vec3(uFreq, uFreq, 1.0) + vec3(0.0, 0.0, uTime) + uSeed;
+  vec2 uv = uCrop.xy + vUv * uCrop.zw;
+  vec3 p = vec3(uv.x * uAspect, uv.y, 0.0) * vec3(uFreq, uFreq, 1.0) + vec3(0.0, 0.0, uTime) + uSeed;
   // warp от warp
   vec2 q = vec2(fbm(p), fbm(p + vec3(5.2, 1.3, 2.8)));
   vec3 p2 = p + vec3(q * 1.6, 0.0);
@@ -91,13 +93,14 @@ uniform sampler2D uSrc;
 uniform sampler2D uField;
 uniform float uAspect;
 uniform float uAmp;      // амплитуда смещения, доли высоты кадра
+uniform vec4 uCrop;
 uniform float uContrast;
 uniform float uGamma;
 vec2 mirror(vec2 x) { return 1.0 - abs(mod(x, 2.0) - 1.0); }
 void main() {
   vec2 offset = (texture(uField, vUv).rg - 0.5) * 4.0 * uAmp;
   offset.x /= uAspect;
-  vec4 c = texture(uSrc, mirror(vUv + offset));
+  vec4 c = texture(uSrc, mirror(uCrop.xy + vUv * uCrop.zw + offset));
   vec3 rgb = mix(vec3(1.0), c.rgb, c.a); // прозрачное — белое
   float l = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
   l = clamp((l - 0.5) * uContrast + 0.5, 0.0, 1.0);

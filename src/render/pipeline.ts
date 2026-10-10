@@ -11,6 +11,8 @@ export interface FrameParams {
   s: Settings;
   seed: number;
   time: number;
+  /** Рендер фрагмента кадра (uv, начало слева снизу): [x, y, ширина, высота]. Нет — весь кадр. */
+  crop?: [number, number, number, number];
 }
 
 interface TargetSet {
@@ -166,7 +168,7 @@ export class Renderer {
     const gl = this.gl;
     const { w, h } = set;
     const { p, s } = fp;
-    const scale = w / this.srcW; // px цели на px исходника
+    const scale = w / (this.srcW * (fp.crop?.[2] ?? 1)); // px цели на px исходника
     const cell = Math.max(1.5, p.dotSize * scale);
     gl.bindVertexArray(this.vao);
     gl.disable(gl.BLEND);
@@ -239,10 +241,13 @@ export class Renderer {
     const h = warp.h;
     const freq = CONST.warpFreqMin + (CONST.warpFreqMax - CONST.warpFreqMin) * Math.pow(p.warpScale, 1.6);
     const seed = fp.seed;
+    const crop = fp.crop ?? [0, 0, 1, 1];
+    const aspect = this.srcW / this.srcH;
     this.gl.bindVertexArray(this.vao);
     this.progs.field
       .use()
-      .f('uAspect', w / h)
+      .f('uAspect', aspect)
+      .f('uCrop', ...crop)
       .f('uFreq', freq)
       .f('uTime', fp.time * CONST.warpFlow)
       .f('uSeed', (seed * 13.37) % 97, (seed * 7.77) % 89, (seed * 3.11) % 83);
@@ -251,7 +256,8 @@ export class Renderer {
       .use()
       .tex('uSrc', 0, this.srcTex!)
       .tex('uField', 1, field.tex)
-      .f('uAspect', w / h)
+      .f('uAspect', aspect)
+      .f('uCrop', ...crop)
       .f('uAmp', p.warpStrength * CONST.warpMaxAmp)
       .f('uContrast', CONST.contrast)
       .f('uGamma', CONST.gamma);

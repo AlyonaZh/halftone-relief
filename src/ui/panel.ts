@@ -1,8 +1,10 @@
-// Панель настроек: Аудио, Искажение, Растр, Рельеф, Контуры, Цвет (SPEC §4, §6, §7, §9).
+// Панель настроек: Пресеты, Аудио, Искажение, Растр, Рельеф, Контуры, Цвет (SPEC §4, §6, §6а, §7, §9).
 import { PARAMS, type ParamKey, type Settings } from '../defaults';
-import { app, loadCollapsed, reactiveSource, saveCollapsed, setMod, setParam, settings } from '../state';
+import { app, dismissCoach, loadCollapsed, reactiveSource, saveCollapsed, setMod, setParam, settings } from '../state';
+import { CoachMark } from './coach';
 import { HsbPicker } from './color-picker';
 import { ICON, h, svg } from './dom';
+import { PresetsSection } from './presets-section';
 import { Slider } from './slider';
 
 export interface PanelActions {
@@ -42,9 +44,11 @@ export class SettingsPanel {
     invert: HTMLButtonElement;
   };
   private picker = new HsbPicker();
+  readonly presets = new PresetsSection();
 
   constructor(private actions: PanelActions) {
     this.el = h('div', { class: 'panel', role: 'region', 'aria-label': 'Настройки' });
+    this.el.append(this.presets.el);
     this.buildAudio();
     this.buildParamsSection('warp', 'Искажение', ['warpStrength', 'warpScale'], [
       h('button', { class: 'text-btn shuffle', type: 'button', onclick: () => this.actions.shuffle() },
@@ -55,6 +59,7 @@ export class SettingsPanel {
     this.contourToggle = toggle('Контуры', () => settings.set((s) => ({ contoursOn: !s.contoursOn })));
     this.buildParamsSection('contours', 'Контуры', ['contourCount', 'contourWidth'], [this.contourToggle]);
     this.buildColor();
+    new CoachMark(this.sliders.get('warpStrength')!, () => this.setCollapsed('warp', false));
 
     settings.subscribe(() => this.sync());
     app.subscribe(() => this.sync());
@@ -97,6 +102,7 @@ export class SettingsPanel {
   }
 
   setCollapsed(id: SectionId, v: boolean) {
+    if (this.isCollapsed(id) === v) return;
     this.collapsed = { ...this.collapsed, [id]: v };
     saveCollapsed(this.collapsed);
     const sec = this.sections.find((s) => s.id === id);
@@ -120,7 +126,7 @@ export class SettingsPanel {
     const s = new Slider({
       def: PARAMS[key],
       onInput: (v) => setParam(key, v),
-      reactive: { onMod: (patch) => setMod(key, patch) },
+      reactive: { onMod: (patch) => setMod(key, patch), onPill: dismissCoach },
     });
     this.sliders.set(key, s);
     return s.el;
@@ -165,7 +171,7 @@ export class SettingsPanel {
           checked: a.useVideoSound,
           onchange: (e: Event) => app.set({ useVideoSound: (e.target as HTMLInputElement).checked }),
         });
-        body.append(h('label', { class: 'check' }, cb, h('span', { class: 'check-box' }), 'Использовать звук из видео'));
+        body.append(h('label', { class: 'check round' }, cb, h('span', { class: 'check-box' }), 'Использовать звук из видео'));
       }
     } else if (a.media === 'video' && a.videoHasAudio) {
       body.append(h('p', { class: 'audio-note' }, 'Реагирует на звук из видео'), addBtn());

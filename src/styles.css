@@ -237,14 +237,6 @@ button:disabled {
 .text-btn:hover {
   color: #fff;
 }
-.link-btn.rx-off {
-  font-size: 14px;
-  color: var(--text-2);
-  font-weight: 400;
-  text-align: left;
-  padding: 4px 0 0;
-}
-
 .m-only {
   display: none !important;
 }
@@ -782,33 +774,243 @@ canvas.gl {
   outline-offset: 2px;
 }
 
-.rx-tag {
+.sl-head {
+  position: relative;
+}
+
+/* Кнопка «Звук» (docs/changes-v6.md §2) */
+.rx-pill {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 24px;
-  height: 22px;
-  padding: 0 5px;
-  border-radius: 5px;
-  color: var(--text-3);
-  font-family: var(--mono);
-  font-size: 11px;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px 0 7px;
+  border-radius: 12px;
+  border: 1px solid #3a3a41;
+  background: #17171a;
+  color: #d0d0d6;
+  font: 500 11px var(--font);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  white-space: nowrap;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+/* невидимое расширение зоны нажатия до 44 px по высоте */
+.rx-pill::before {
+  content: '';
+  position: absolute;
+  top: -11px;
+  bottom: -11px;
+  left: -4px;
+  right: -4px;
+}
+.rx-pill .rx-ico {
+  width: 12px;
+  height: 12px;
+}
+.rx-pill:hover {
+  border-color: #6a6a72;
+  background: #202024;
+  color: #ffffff;
+}
+.rx-pill:focus-visible {
+  outline: 2px solid #ededf0;
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+.rx-pill.on {
+  background: #ededf0;
+  border-color: #ededf0;
+  color: #0a0a0b;
+  font: 500 10px var(--mono);
+}
+.rx-pill.hl {
+  border-color: #8c8c95;
+  box-shadow: 0 0 0 3px rgba(237, 237, 240, 0.12);
+}
+.no-reactive .rx-pill {
+  display: none;
+}
+
+/* Всплывающие подсказки — общий тёмный стиль */
+.tip {
+  position: fixed;
+  z-index: 200;
+  max-width: 220px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #1c1c20;
+  border: 1px solid #2e2e34;
+  color: #ededf0;
+  font: 400 12px/1.4 var(--font);
+  white-space: pre-line;
+  pointer-events: none;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+}
+.tip::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: calc(var(--arrow-x, 50%) - 4px);
+  width: 8px;
+  height: 8px;
+  background: #1c1c20;
+  border-left: 1px solid #2e2e34;
+  border-top: 1px solid #2e2e34;
+  transform: rotate(45deg);
+}
+.tip.above::before {
+  top: auto;
+  bottom: -5px;
+  transform: rotate(225deg);
+}
+
+/* Подсказка первого входа (docs/changes-v6.md §3) */
+.coach {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 6;
+  width: 252px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 12px 14px 16px;
+  border-radius: 12px;
+  background: #1c1c20;
+  border: 1px solid #2e2e34;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6);
+  color: #ededf0;
+}
+.coach::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: calc(var(--arrow-x, 85%) - 5px);
+  width: 10px;
+  height: 10px;
+  background: #1c1c20;
+  border-left: 1px solid #2e2e34;
+  border-top: 1px solid #2e2e34;
+  transform: rotate(45deg);
+}
+.coach-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.coach-title {
+  flex: 1;
+  padding-top: 3px;
+  font-size: 14px;
   font-weight: 600;
 }
-.rx-tag:hover {
-  color: var(--text);
-  background: #19191c;
+.coach-x {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 6px;
+  color: #8c8c95;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
-.rx-tag .ico {
-  width: 14px;
-  height: 14px;
+.coach-x::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
 }
-.rx-tag.active {
-  background: #ededf0;
-  color: #0a0a0b;
+.coach-x .ico {
+  width: 12px;
+  height: 12px;
 }
-.no-reactive .rx-tag {
+.coach-x:hover {
+  color: #ededf0;
+  background: #26262a;
+}
+.coach-text {
+  margin: 0;
+  padding-right: 4px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #a8a8b0;
+}
+
+/* Пресеты (docs/changes-v6.md §5) */
+.sec-presets .sec-body {
+  gap: 10px;
+}
+.presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.preset {
+  position: relative;
+  height: 64px;
+  border-radius: 8px;
+  background: #161618;
+  overflow: hidden;
+}
+.preset-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.preset-img.ready {
+  opacity: 1;
+}
+.preset-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+  transition: box-shadow 0.15s;
+}
+.preset:hover .preset-ring {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+.preset.on .preset-ring {
+  box-shadow: inset 0 0 0 2px #ededf0, inset 0 0 0 3px #0a0a0b;
+}
+.preset[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+.preset[aria-disabled='true'] .preset-img.ready {
+  opacity: 0.28;
+  filter: grayscale(1);
+}
+.preset[aria-disabled='true']:hover .preset-ring {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.preset:focus-visible {
+  outline: 2px solid #ededf0;
+  outline-offset: 2px;
+}
+.preset-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #a8a8b0;
+}
+
+/* Строка-расшифровка источника — только на сенсорных экранах и мобильной раскладке */
+.rx-line {
   display: none;
+  margin: -4px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #a8a8b0;
+}
+@media (hover: none) {
+  .rx-line {
+    display: block;
+  }
 }
 
 .rx-pop {
@@ -949,6 +1151,17 @@ canvas.gl {
   border-left: 2px solid #0a0a0b;
   border-bottom: 2px solid #0a0a0b;
   transform: rotate(-45deg) translate(1px, -1px);
+}
+/* чекбокс с круглой отметкой */
+.check.round .check-box {
+  border-radius: 50%;
+}
+.check.round input:checked + .check-box {
+  background: #0a0a0b;
+  border: 5px solid #ededf0;
+}
+.check.round input:checked + .check-box::after {
+  content: none;
 }
 .check input:focus-visible + .check-box {
   outline: 2px solid #ededf0;
@@ -1566,15 +1779,16 @@ canvas.gl {
     left: calc(12px + var(--a, 0) * (100% - 24px) - 4px);
     width: calc((var(--b, 0) - var(--a, 0)) * (100% - 24px) + 8px);
   }
-  .rx-tag {
-    min-width: 44px;
-    height: 44px;
-    margin: -10px 0;
+  .rx-line {
+    display: block;
   }
-  .rx-tag.active {
-    min-width: 36px;
-    height: 26px;
-    margin: 0;
+  .coach {
+    left: 0;
+    right: 0;
+    width: auto;
+  }
+  .preset {
+    min-height: 64px;
   }
   .seg-btn {
     height: 44px;
