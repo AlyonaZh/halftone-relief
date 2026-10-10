@@ -7,6 +7,7 @@ import { exportName, isTouchDevice, pixelsToPng, saveBlob } from './export/save'
 import { buildSvg } from './export/svg';
 import { Transport } from './media/transport';
 import { detectKind, loadAudio, loadPhoto, loadVideo, MediaError, MSG, type LoadedPhoto, type LoadedVideo } from './media/validate';
+import { PRESETS } from './presets';
 import { Renderer, type FrameParams } from './render/pipeline';
 import { app, reactiveSource, settings } from './state';
 import { ICON, clamp, h, isMobileLayout, svg } from './ui/dom';
@@ -86,7 +87,7 @@ const panel = new SettingsPanel({
   addAudio: pickAudio,
   removeAudio: () => removeAudio(),
   shuffle: () => {
-    app.set({ seed: Math.random() * 1000 });
+    app.set({ seed: Math.random() * 1000, preset: null });
   },
 });
 const exportPanel = new ExportPanel({
@@ -158,7 +159,10 @@ interface Recording {
 }
 let recording: Recording | null = null;
 
-settings.subscribe(() => (dirty = true));
+settings.subscribe(() => {
+  dirty = true;
+  presetsDirty = true;
+});
 app.subscribe((s, prev) => {
   dirty = true;
   exportBtn.disabled = s.media === 'none';
@@ -281,6 +285,9 @@ function setMedia(m: LoadedPhoto | LoadedVideo) {
     v.addEventListener('loadeddata', () => (videoFrameReady = true));
   }
   renderer!.setSource(m.el, m.width, m.height);
+  presetsDirty = true;
+  presetsOnce = false;
+  for (const p of PRESETS) panel.presets.setPreview(p.id, null);
   app.set({
     media: m.kind,
     srcWidth: m.width,
@@ -510,6 +517,7 @@ function loop(now: number) {
     renderer.uploadSource();
     videoFrameReady = false;
     dirty = true;
+    presetsDirty = true;
   }
   const mods = modActive();
   if (playing && (app.get().timeline || mods)) dirty = true;
@@ -525,6 +533,7 @@ function loop(now: number) {
   if (mods) panel.frame(eff);
   if (app.get().timeline) timeline.frame(transport.time);
   if (recording) recordingTick(now);
+  else presetPreviewTick(now);
 }
 requestAnimationFrame(loop);
 
@@ -547,6 +556,51 @@ function trackFps(now: number, continuous: boolean) {
   }
 }
 
+// ---------- Превью пресетов ----------
+// Рендер текущего файла с параметрами пресета, без реакции на звук. Не чаще раза в секунду;
+// видео на телефоне — один раз, по первому кадру. Показываем центральный фрагмент кадра,
+// чтобы в маленькой карточке были видны точки растра.
+
+let presetsDirty = true;
+let presetsOnce = false;
+let presetsAt = -Infinity;
+
+app.subscribe((s, prev) => {
+  if (s.seed !== prev.seed) presetsDirty = true;
+});
+
+function presetPreviewTick(now: number) {
+  if (!renderer?.hasSource || !presetsDirty || now - presetsAt < 1000) return;
+  const a = app.get();
+  if (a.media === 'video' && isTouchDevice() && presetsOnce) {
+    presetsDirty = false;
+    return;
+  }
+  const [cw, ch] = panel.presets.cardPixelSize();
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const { srcWidth: sw, srcHeight: sh } = a;
+  const kCss = Math.max(0.5, cw / dpr / sw, ch / dpr / sh);
+  const cropW = cw / dpr / kCss / sw;
+  const cropH = ch / dpr / kCss / sh;
+  const base = frameParams(settings.get().params);
+  for (const p of PRESETS) {
+    const fp: FrameParams = {
+      ...base,
+      p: { ...base.p, ...p.params },
+      s: { ...base.s, contoursOn: p.contoursOn },
+      crop: [0.5 - cropW / 2, 0.5 - cropH / 2, cropW, cropH],
+    };
+    try {
+      panel.presets.setPreview(p.id, renderer.renderPixels(cw, ch, fp), cw, ch);
+    } catch (e) {
+      console.warn('preset preview', e);
+    }
+  }
+  presetsAt = now;
+  presetsDirty = false;
+  presetsOnce = true;
+}
+
 // ---------- Сброс настроек ----------
 
 let toastTimer = 0;
@@ -554,6 +608,7 @@ function resetSettings() {
   if (recording) return;
   const snapshot = settings.get();
   settings.set(defaultSettings());
+  app.set({ preset: null });
   toastText.textContent = 'Настройки сброшены';
   toast.hidden = false;
   toastUndo.onclick = () => {

@@ -1,7 +1,16 @@
 // Слайдер: полутоновая дорожка, хромовый ползунок, нативный input[type=range] для клавиатуры,
-// метка и встроенное окно аудиореактивности (SPEC §6, §9).
-import { type AudioSource, type Modulation, type ParamDef } from '../defaults';
+// кнопка «Звук» и встроенное окно аудиореактивности (SPEC §6, §9; docs/changes-v6.md §2, §4).
+import {
+  SOUND_BUTTON_TIP,
+  SOURCE_ORDER,
+  SOURCE_SHORT,
+  pillTip,
+  sourceButtonTip,
+  sourceLine,
+} from '../audio/sources';
+import { type Modulation, type ParamDef } from '../defaults';
 import { ICON, clamp, h, svg } from './dom';
+import { setTip, tooltip } from './tooltip';
 
 let uid = 0;
 
@@ -11,12 +20,11 @@ export interface SliderOptions {
   /** Включить метку реактивности */
   reactive?: {
     onMod: (patch: Partial<Modulation>) => void;
+    /** Нажатие на кнопку «Звук» (закрывает подсказку первого входа) */
+    onPill?: () => void;
   };
   compact?: boolean;
 }
-
-const SRC_LABEL: Record<AudioSource, string> = { low: 'НЧ', mid: 'СЧ', high: 'ВЧ', kick: 'КИК' };
-const SRC_ORDER: AudioSource[] = ['low', 'mid', 'high', 'kick'];
 
 let openPopover: Slider | null = null;
 
@@ -31,6 +39,8 @@ export class Slider {
   private pop: HTMLDivElement | null = null;
   private depth: Slider | null = null;
   private srcBtns: HTMLButtonElement[] = [];
+  private srcLine: HTMLParagraphElement | null = null;
+  readonly head: HTMLDivElement;
   private value = 0;
   private mod: Modulation = { source: null, depth: 0.3 };
   private reactiveAvailable = false;
@@ -62,13 +72,19 @@ export class Slider {
     this.bindPointer();
 
     const head = h('div', { class: 'sl-head' }, h('label', { class: 'sl-label', for: id }, def.label));
+    this.head = head;
     if (o.reactive) {
       this.tag = h('button', {
-        class: 'rx-tag',
+        class: 'rx-pill',
         type: 'button',
-        'aria-label': `Реакция на звук: ${def.label}`,
-        onclick: () => this.togglePopover(),
+        'aria-haspopup': 'dialog',
+        'aria-expanded': 'false',
+        onclick: () => {
+          o.reactive!.onPill?.();
+          this.togglePopover();
+        },
       });
+      tooltip(this.tag);
       head.append(this.tag);
       this.buildPopover();
     }
@@ -151,13 +167,26 @@ export class Slider {
       'aria-label': 'Закрыть',
       onclick: () => this.togglePopover(false),
     }, svg(ICON.close));
-    this.srcBtns = SRC_ORDER.map((s) =>
-      h('button', {
+    // повторное нажатие на выбранный источник отключает реакцию; глубина запоминается
+    this.srcBtns = SOURCE_ORDER.map((s) => {
+      const b = h('button', {
         type: 'button',
         class: 'seg-btn',
-        onclick: () => this.o.reactive!.onMod({ source: s }),
-      }, SRC_LABEL[s]),
-    );
+        'aria-pressed': 'false',
+        onclick: () => {
+          if (this.mod.source === s) {
+            this.o.reactive!.onMod({ source: null });
+            this.togglePopover(false);
+            this.tag?.focus({ preventScroll: true });
+          } else {
+            this.o.reactive!.onMod({ source: s });
+          }
+        },
+      }, SOURCE_SHORT[s]);
+      tooltip(b, sourceButtonTip(s, false));
+      return b;
+    });
+    this.srcLine = h('p', { class: 'rx-line' }, sourceLine(null));
     this.depth = new Slider({
       def: {
         label: 'Глубина',
@@ -169,19 +198,11 @@ export class Slider {
       onInput: (v) => this.o.reactive!.onMod({ depth: v }),
       compact: true,
     });
-    const off = h('button', {
-      class: 'link-btn rx-off',
-      type: 'button',
-      onclick: () => {
-        this.o.reactive!.onMod({ source: null });
-        this.togglePopover(false);
-      },
-    }, 'Отключить реакцию');
-    this.pop = h('div', { class: 'rx-pop', hidden: true, role: 'group', 'aria-label': 'Реакция на звук' },
+    this.pop = h('div', { class: 'rx-pop', hidden: true, role: 'dialog', 'aria-label': `Реакция на звук: ${this.o.def.label}` },
       h('div', { class: 'rx-head' }, h('span', null, 'Реагирует на'), close),
       h('div', { class: 'seg rx-src' }, this.srcBtns),
+      this.srcLine,
       this.depth.el,
-      off,
     );
   }
 
@@ -224,9 +245,22 @@ export class Slider {
     this.tag.hidden = !available;
     if (!available && this.pop && !this.pop.hidden) this.togglePopover(false);
     const active = available && !!mod.source;
-    this.tag.classList.toggle('active', active);
-    this.tag.replaceChildren(active ? SRC_LABEL[mod.source!] : svg(ICON.freq));
-    this.srcBtns.forEach((b, i) => b.classList.toggle('on', SRC_ORDER[i] === mod.source));
+    const label = this.o.def.label;
+    this.tag.classList.toggle('on', active);
+    this.tag.replaceChildren(svg(ICON.freq, 'ico rx-ico'), active ? SOURCE_SHORT[mod.source!] : 'Звук');
+    this.tag.setAttribute(
+      'aria-label',
+      active ? `Реакция на звук: ${SOURCE_SHORT[mod.source!]}, настроить — ${label}` : `Включить реакцию на звук — ${label}`,
+    );
+    setTip(this.tag, active ? pillTip(mod.source!) : SOUND_BUTTON_TIP);
+    this.srcBtns.forEach((b, i) => {
+      const s = SOURCE_ORDER[i];
+      const on = s === mod.source;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+      setTip(b, sourceButtonTip(s, on));
+    });
+    if (this.srcLine) this.srcLine.textContent = sourceLine(mod.source);
     this.depth?.setValue(mod.depth);
     this.updateZone();
   }
@@ -239,6 +273,11 @@ export class Slider {
     const b = clamp(a + this.mod.depth, 0, 1);
     this.zone.style.setProperty('--a', String(a));
     this.zone.style.setProperty('--b', String(b));
+  }
+
+  /** Кнопка «Звук» (для подсказки первого входа) */
+  get pill() {
+    return this.tag;
   }
 
   /** Текущее значение с модуляцией (призрачный ползунок) */
